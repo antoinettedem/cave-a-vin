@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ma Cave à Vin</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --stone: #c8b99a;
+    --stone-dark: #9e8b72;
+    --stone-light: #e8ddd0;
+    --wine-red: #6b1e2a;
+    --wine-deep: #3d0d14;
+    --wine-light: #a0394a;
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --cream: #f5efe6;
+    --cell: 58px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Libre Baskerville', serif;
+    background: var(--wine-deep);
+    min-height: 100vh;
+    color: var(--cream);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 0 0 80px;
+  }
+
+  /* Header */
+  header {
+    padding: 32px 24px 20px;
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+  }
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+  .cave-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--gold-light);
+    line-height: 1.1;
+  }
+  .cave-subtitle {
+    font-size: 11px;
+    color: var(--stone);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  .bottle-count { text-align: right; }
+  .count-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .count-label {
+    font-size: 10px;
+    color: var(--stone);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Workspace */
+  .cave-workspace {
+    padding: 20px 16px 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .cave-grid-col { width: auto; }
+
+  .cave-label { display: none; }
+
+  /* Grid 5×7 — remplit la largeur disponible */
+  .cave-grid {
+    display: grid;
+    grid-template-columns: repeat(5, var(--cell));
+    gap: 5px;
+  }
+
+  /* Each slot */
+  .grid-slot {
+    width: var(--cell);
+    height: var(--cell);
+    border-radius: 6px;
+    border: 1.5px dashed transparent;
+    position: relative;
+    transition: border-color 0.12s, background 0.12s;
+  }
+
+  .grid-slot.occupied {
+    border: none;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* Drag highlight feedback */
+  .grid-slot.drop-ok {
+    border-color: var(--gold) !important;
+    border-style: dashed !important;
+    background: rgba(201,168,76,0.12);
+  }
+  .grid-slot.drop-swap {
+    border-color: rgba(201,168,76,0.4) !important;
+    border-style: solid !important;
+    background: rgba(201,168,76,0.06);
+  }
+  .grid-slot.drop-no {
+    border-color: rgba(192,57,43,0.4) !important;
+    border-style: dashed !important;
+  }
+
+  body.is-dragging * { cursor: grabbing !important; }
+
+  /* Casier visuals inside a slot */
+  .casier-wrap {
+    width: 100%;
+    height: 100%;
+  }
+  .casier-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    border: 1.5px solid rgba(201,168,76,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .filled .casier-inner {
+    background: linear-gradient(135deg, rgba(107,30,42,0.6) 0%, rgba(61,13,20,0.8) 100%);
+    border-color: rgba(201,168,76,0.4);
+  }
+  .empty .casier-inner {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.08);
+    border-style: dashed;
+  }
+  .casier-hole {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .filled .casier-hole {
+    background: radial-gradient(circle at 35% 35%, var(--wine-light), var(--wine-deep));
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6), 0 0 0 2px rgba(201,168,76,0.2);
+  }
+  .empty .casier-hole {
+    background: rgba(0,0,0,0.3);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .bottle-icon {
+    font-size: 16px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  }
+  .casier-mini-info {
+    position: absolute;
+    bottom: 2px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 7px;
+    color: var(--gold-light);
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 3px;
+    font-family: 'Playfair Display', serif;
+  }
+  .casier-number { display: none; }
+
+  /* Palette — bouton flottant bas droite */
+  .cave-palette { display: none; } /* masqué, remplacé par le FAB */
+
+  .palette-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(201,168,76,0.2);
+    background: rgba(61,13,20,0.7);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    z-index: 50;
+    transition: border-color 0.2s, background 0.2s, opacity 0.2s;
+    opacity: 0.45;
+  }
+  .palette-fab:hover { opacity: 1; border-color: rgba(201,168,76,0.5); }
+  .palette-fab .add-icon {
+    font-size: 18px;
+    color: var(--gold);
+    line-height: 1;
+    font-family: 'Playfair Display', serif;
+  }
+
+  .drag-hint { display: none; }
+
+  /* Slots visibles pendant drag palette */
+  body.is-dragging .grid-slot:not(.occupied) {
+    border-color: rgba(201,168,76,0.2) !important;
+    border-style: dashed !important;
+  }
+
+  /* Mode placement (tap sur +) */
+  body.placement-mode .grid-slot:not(.occupied) {
+    border-color: rgba(201,168,76,0.4) !important;
+    border-style: dashed !important;
+    cursor: pointer;
+    background: rgba(201,168,76,0.04);
+  }
+  body.placement-mode .grid-slot:not(.occupied):hover {
+    border-color: rgba(201,168,76,0.75) !important;
+    background: rgba(201,168,76,0.1);
+  }
+
+  /* FAB en mode actif */
+  .palette-fab.active {
+    opacity: 1 !important;
+    border-color: rgba(201,168,76,0.6);
+    background: rgba(107,30,42,0.85);
+  }
+  .palette-fab.active .add-icon { opacity: 1; }
+
+  /* Stats */
+  .stats-bar {
+    margin: 0 16px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    gap: 16px;
+  }
+  .stat { flex: 1; text-align: center; }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--gold-light);
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--stone-dark);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    backdrop-filter: blur(4px);
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: linear-gradient(160deg, #2a1a0e 0%, var(--wine-deep) 100%);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-bottom: none;
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 480px;
+    padding: 24px 24px 40px;
+    animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--gold-light);
+    margin-bottom: 4px;
+  }
+  .modal-casier-num {
+    font-size: 11px;
+    color: var(--stone-dark);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--stone-dark);
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--cream);
+    font-family: 'Libre Baskerville', serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .field input:focus {
+    border-color: var(--gold);
+    background: rgba(255,255,255,0.08);
+  }
+  .field input::placeholder { color: rgba(255,255,255,0.2); }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Libre Baskerville', serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--wine-red), var(--wine-deep));
+    color: var(--gold-light);
+    border: 1px solid rgba(201,168,76,0.3);
+  }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--stone);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-danger {
+    background: transparent;
+    color: #c0392b;
+    border: 1px solid rgba(192,57,43,0.3);
+    flex: 0;
+    padding: 12px 16px;
+  }
+  .wine-info {
+    padding: 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(201,168,76,0.15);
+    margin-bottom: 16px;
+  }
+  .wine-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--cream);
+    margin-bottom: 2px;
+  }
+  .wine-domaine {
+    font-size: 13px;
+    color: var(--gold);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .wine-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .wine-tag {
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    background: rgba(201,168,76,0.1);
+    color: var(--gold-light);
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+  .btn-delete-casier {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(192,57,43,0.2);
+    background: transparent;
+    color: rgba(192,57,43,0.6);
+    font-family: 'Libre Baskerville', serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-delete-casier:hover {
+    border-color: rgba(192,57,43,0.5);
+    color: #c0392b;
+    background: rgba(192,57,43,0.05);
+  }
+
+  /* Sync indicator */
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin: 5px auto 0;
+    background: transparent;
+    transition: background 0.4s;
+  }
+  .sync-dot.syncing { background: var(--gold); animation: blink 0.8s ease-in-out infinite; }
+  .sync-dot.ok      { background: #5a9e6f; }
+  .sync-dot.error   { background: #c0392b; }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="header-top">
+      <div>
+        <h1 class="cave-title">Ma Cave</h1>
+        <div class="cave-subtitle">Argicru · Bordeaux</div>
+      </div>
+      <div class="bottle-count">
+        <div class="count-number" id="filledCount">0</div>
+        <div class="count-label">bouteilles</div>
+        <div class="sync-dot" id="syncStatus"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="cave-workspace">
+    <div class="cave-grid-col">
+      <div class="cave-label">Grille 5 × 7</div>
+      <div class="cave-grid" id="caveGrid"></div>
+      <div class="drag-hint">✦ glisser pour déplacer · toucher pour modifier</div>
+    </div>
+  </div>
+
+  <!-- Bouton flottant ajout casier -->
+  <div class="palette-fab" id="paletteItem">
+    <span class="add-icon">+</span>
+  </div>
+
+  <div class="stats-bar" id="statsBar"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Casier</div>
+    <div class="modal-casier-num" id="modalCasierNum"></div>
+
+    <!-- View mode -->
+    <div id="viewMode">
+      <div class="wine-info" id="wineInfoDisplay"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal()">Fermer</button>
+        <button class="btn btn-primary" onclick="switchToEdit()">Modifier</button>
+        <button class="btn btn-danger" onclick="removeWine()">✕</button>
+      </div>
+    </div>
+
+    <!-- Edit mode -->
+    <div id="editMode" style="display:none">
+      <div class="field">
+        <label>Nom du vin</label>
+        <input type="text" id="inputNom" placeholder="ex: Château Margaux" />
+      </div>
+      <div class="field">
+        <label>Domaine</label>
+        <input type="text" id="inputDomaine" placeholder="ex: Château Margaux" />
+      </div>
+      <div class="field">
+        <label>Millésime</label>
+        <input type="number" id="inputMillesime" placeholder="ex: 2018" min="1900" max="2030" />
+      </div>
+      <div class="field">
+        <label>Région</label>
+        <input type="text" id="inputRegion" list="regions" placeholder="ex: Bordeaux" />
+        <datalist id="regions">
+          <option value="Bordeaux"><option value="Bourgogne">
+          <option value="Champagne"><option value="Rhône">
+          <option value="Loire"><option value="Alsace">
+          <option value="Provence"><option value="Languedoc">
+          <option value="Beaujolais"><option value="Jura">
+          <option value="Corse"><option value="Italie">
+          <option value="Espagne"><option value="Portugal">
+        </datalist>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="cancelEdit()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveWine()">Enregistrer</button>
+      </div>
+    </div>
+
+    <button class="btn-delete-casier" onclick="deleteCasier()">— Supprimer ce casier —</button>
+  </div>
+</div>
+
+<script>
+// ─── Config ───
+const COLS = 5;
+const ROWS = 7;
+const SIZE = COLS * ROWS; // 35 slots
+
+const WEBAPP_URL = 'YOUR_WEBAPP_URL'; // ← URL du Apps Script (Extensions → Apps Script → Déployer)
+
+// ─── Data ───
+let positions  = Array(SIZE).fill(null);
+let _saveTimer = null;
+
+// ─── Sync UI ───
+function setSyncStatus(s) {
+  const el = document.getElementById('syncStatus');
+  if (el) el.className = 'sync-dot ' + s;
+}
+
+// ─── Save (localStorage immédiat + Sheets debounced 600ms) ───
+function save() {
+  localStorage.setItem('cave_positions', JSON.stringify(positions));
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveToSheets, 600);
+}
+
+// ─── Google Sheets via Apps Script ───
+async function loadFromSheets() {
+  setSyncStatus('syncing');
+  try {
+    const r    = await fetch(WEBAPP_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rows = await r.json();
+    const p    = Array(SIZE).fill(null);
+    for (let i = 1; i < rows.length; i++) {
+      const [pos, id, nom, domaine, millesime, region] = rows[i];
+      const idx = parseInt(pos);
+      if (!isNaN(idx) && idx >= 0 && idx < SIZE) {
+        p[idx] = {
+          id: parseInt(id) || i,
+          wine: (nom || domaine || millesime || region)
+            ? { nom: nom||'', domaine: domaine||'', millesime: millesime||'', region: region||'' }
+            : null
+        };
+      }
+    }
+    positions = p;
+    localStorage.setItem('cave_positions', JSON.stringify(positions));
+    setSyncStatus('ok');
+  } catch(e) {
+    console.warn('Sheets load:', e.message);
+    const loc = JSON.parse(localStorage.getItem('cave_positions') || 'null');
+    if (loc && loc.length === SIZE) positions = loc;
+    setSyncStatus('error');
+  }
+  render();
+}
+
+async function saveToSheets() {
+  if (WEBAPP_URL === 'YOUR_WEBAPP_URL') return;
+  setSyncStatus('syncing');
+  const values = [['position','id','nom','domaine','millesime','region']];
+  for (let i = 0; i < SIZE; i++) {
+    if (positions[i]) {
+      const { id, wine } = positions[i];
+      values.push([i, id, wine?.nom||'', wine?.domaine||'', wine?.millesime||'', wine?.region||'']);
+    }
+  }
+  try {
+    await fetch(WEBAPP_URL, { method: 'POST', body: JSON.stringify(values) });
+    setSyncStatus('ok');
+  } catch(e) {
+    console.warn('Sheets save:', e.message);
+    setSyncStatus('error');
+  }
+}
+
+function nextId() {
+  const ids = positions.filter(Boolean).map(p => p.id);
+  return ids.length ? Math.max(...ids) + 1 : 1;
+}
+
+// ─── Render ───
+function render() {
+  const grid = document.getElementById('caveGrid');
+  grid.innerHTML = '';
+
+  for (let i = 0; i < SIZE; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'grid-slot';
+    slot.dataset.slot = i;
+
+    const casier = positions[i];
+    if (casier) {
+      slot.classList.add('occupied');
+      const hasWine = !!casier.wine;
+      slot.innerHTML = `
+        <div class="casier-wrap ${hasWine ? 'filled' : 'empty'}">
+          <div class="casier-inner">
+            <span class="casier-number">${casier.id}</span>
+            <div class="casier-hole">
+              ${hasWine ? '<span class="bottle-icon">🍷</span>' : ''}
+            </div>
+            ${hasWine && casier.wine.millesime ? `<div class="casier-mini-info">${casier.wine.millesime}</div>` : ''}
+          </div>
+        </div>`;
+      attachSlotDrag(slot, i);
+    }
+
+    grid.appendChild(slot);
+  }
+
+  updateStats();
+}
+
+// ─── Drag ───
+let drag = null;
+
+function makeGhost(label, isCasier) {
+  const g = document.createElement('div');
+  g.style.cssText = `position:fixed;pointer-events:none;z-index:9999;border-radius:6px;
+    opacity:0.88;transform:scale(1.1) rotate(2deg);box-shadow:0 10px 28px rgba(0,0,0,0.55);
+    border:1.5px dashed rgba(201,168,76,0.5);background:rgba(61,13,20,0.9);
+    display:flex;align-items:center;justify-content:center;`;
+  const firstSlot = document.querySelector('.grid-slot');
+  const slotSize = firstSlot ? firstSlot.getBoundingClientRect().width + 'px' : '80px';
+  g.style.width = g.style.height = slotSize;
+  g.innerHTML = isCasier
+    ? label
+    : `<span style="font-size:20px;color:#c9a84c;opacity:0.9;font-family:'Playfair Display',serif">+</span>`;
+  document.body.appendChild(g);
+  return g;
+}
+
+function positionGhost(e) {
+  if (!drag) return;
+  drag.ghost.style.left = (e.clientX - drag.ox) + 'px';
+  drag.ghost.style.top  = (e.clientY - drag.oy) + 'px';
+}
+
+function slotUnder(e) {
+  drag.ghost.style.visibility = 'hidden';
+  if (drag.srcSlot) drag.srcSlot.style.visibility = 'hidden';
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  drag.ghost.style.visibility = 'visible';
+  if (drag.srcSlot) drag.srcSlot.style.visibility = '';
+  return el?.closest('.grid-slot') || null;
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.drop-ok,.drop-swap,.drop-no')
+    .forEach(el => el.classList.remove('drop-ok','drop-swap','drop-no'));
+}
+
+function startDrag(e, srcSlot, srcIdx, ghostHTML, isNew) {
+  const ref = srcSlot || document.getElementById('paletteItem');
+  const rect = ref.getBoundingClientRect();
+  const ghost = makeGhost(ghostHTML, !isNew);
+
+  if (srcSlot) srcSlot.style.opacity = '0';
+  document.body.classList.add('is-dragging');
+
+  drag = {
+    ghost,
+    srcSlot,
+    srcIdx,    // null if from palette
+    isNew,
+    ox: e.clientX - rect.left,
+    oy: e.clientY - rect.top,
+    targetIdx: null,
+  };
+
+  ghost.style.left = (e.clientX - drag.ox) + 'px';
+  ghost.style.top  = (e.clientY - drag.oy) + 'px';
+}
+
+function onDragMove(e) {
+  e.preventDefault();
+  if (!drag) return;
+  positionGhost(e);
+
+  clearHighlights();
+  const target = slotUnder(e);
+  if (!target) { drag.targetIdx = null; return; }
+
+  const idx = parseInt(target.dataset.slot);
+  if (idx === drag.srcIdx) { drag.targetIdx = null; return; }
+
+  drag.targetIdx = idx;
+
+  if (drag.isNew) {
+    target.classList.add(positions[idx] ? 'drop-no' : 'drop-ok');
+  } else {
+    target.classList.add(positions[idx] ? 'drop-swap' : 'drop-ok');
+  }
+}
+
+function onDragEnd() {
+  if (!drag) return;
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragEnd);
+
+  drag.ghost.remove();
+  clearHighlights();
+  if (drag.srcSlot) drag.srcSlot.style.opacity = '';
+  document.body.classList.remove('is-dragging');
+
+  const ti = drag.targetIdx;
+  if (ti !== null) {
+    if (drag.isNew) {
+      if (!positions[ti]) {
+        positions[ti] = { id: nextId(), wine: null };
+        save();
+      }
+    } else {
+      // swap or move
+      const si = drag.srcIdx;
+      const tmp = positions[ti];
+      positions[ti] = positions[si];
+      positions[si] = tmp;
+      save();
+    }
+  }
+
+  drag = null;
+  render();
+}
+
+// Attach drag to an occupied slot
+function attachSlotDrag(slot, idx) {
+  slot.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+
+    const sx = e.clientX, sy = e.clientY;
+    let started = false;
+
+    function onMove(ev) {
+      ev.preventDefault();
+      if (!started) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) {
+          started = true;
+          const casier = positions[idx];
+          const hasWine = !!casier?.wine;
+          const ghostHTML = `<div class="casier-wrap ${hasWine ? 'filled' : 'empty'}" style="width:100%;height:100%"><div class="casier-inner"><div class="casier-hole">${hasWine ? '<span class="bottle-icon">🍷</span>' : ''}</div></div></div>`;
+          startDrag(ev, slot, idx, ghostHTML, false);
+          document.addEventListener('pointermove', onDragMove, { passive: false });
+          document.addEventListener('pointerup', onDragEnd);
+        }
+        return;
+      }
+    }
+
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!started) openModal(idx);
+    }
+
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onUp);
+  });
+}
+
+// ─── Mode placement (tap sur le FAB) ───
+let placementMode = false;
+
+function enterPlacementMode() {
+  placementMode = true;
+  document.body.classList.add('placement-mode');
+  const fab = document.getElementById('paletteItem');
+  fab.classList.add('active');
+  fab.querySelector('.add-icon').textContent = '×';
+}
+
+function exitPlacementMode() {
+  placementMode = false;
+  document.body.classList.remove('placement-mode');
+  const fab = document.getElementById('paletteItem');
+  fab.classList.remove('active');
+  fab.querySelector('.add-icon').textContent = '+';
+}
+
+// Clic sur un slot vide en mode placement
+document.getElementById('caveGrid').addEventListener('click', (e) => {
+  if (!placementMode) return;
+  const slot = e.target.closest('.grid-slot');
+  if (!slot || slot.classList.contains('occupied')) return;
+  const idx = parseInt(slot.dataset.slot);
+  positions[idx] = { id: nextId(), wine: null };
+  save();
+  exitPlacementMode();
+  render();
+});
+
+// FAB — tap = mode placement, drag = drag direct
+document.getElementById('paletteItem').addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+
+  const sx = e.clientX, sy = e.clientY;
+  let started = false;
+
+  function onMove(ev) {
+    ev.preventDefault();
+    if (!started) {
+      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) {
+        started = true;
+        if (placementMode) exitPlacementMode();
+        startDrag(ev, null, null, null, true);
+        document.addEventListener('pointermove', onDragMove, { passive: false });
+        document.addEventListener('pointerup', onDragEnd);
+      }
+      return;
+    }
+  }
+
+  function onUp() {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    if (!started) {
+      // Tap : toggle placement mode
+      if (placementMode) exitPlacementMode();
+      else enterPlacementMode();
+    }
+  }
+
+  document.addEventListener('pointermove', onMove, { passive: false });
+  document.addEventListener('pointerup', onUp);
+});
+
+// ─── Stats ───
+function updateStats() {
+  const casiers = positions.filter(Boolean);
+  const filled  = casiers.filter(c => c.wine).length;
+  const total   = casiers.length;
+
+  document.getElementById('filledCount').textContent = filled;
+
+  const regions = {};
+  casiers.forEach(c => {
+    if (c.wine?.region) regions[c.wine.region] = (regions[c.wine.region] || 0) + 1;
+  });
+  const top = Object.entries(regions).sort((a,b) => b[1]-a[1])[0];
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat"><div class="stat-value">${filled}</div><div class="stat-label">bouteilles</div></div>
+    <div class="stat"><div class="stat-value">${total}</div><div class="stat-label">casiers</div></div>
+    <div class="stat"><div class="stat-value">${top ? top[0].slice(0,4) : '—'}</div><div class="stat-label">région #1</div></div>`;
+}
+
+// ─── Modal ───
+let currentSlot = null;
+
+function openModal(slotIdx) {
+  const casier = positions[slotIdx];
+  if (!casier) return;
+  currentSlot = slotIdx;
+
+  document.getElementById('modalCasierNum').textContent = `Casier n°${casier.id}`;
+
+  if (casier.wine) showViewMode(casier.wine);
+  else showEditMode();
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function showViewMode(wine) {
+  document.getElementById('viewMode').style.display = 'block';
+  document.getElementById('editMode').style.display = 'none';
+  document.getElementById('modalTitle').textContent = wine.nom;
+  document.getElementById('wineInfoDisplay').innerHTML = `
+    <div class="wine-name">${wine.nom}</div>
+    <div class="wine-domaine">${wine.domaine || ''}</div>
+    <div class="wine-tags">
+      ${wine.millesime ? `<span class="wine-tag">🗓 ${wine.millesime}</span>` : ''}
+      ${wine.region ? `<span class="wine-tag">📍 ${wine.region}</span>` : ''}
+    </div>`;
+}
+
+function showEditMode() {
+  document.getElementById('viewMode').style.display = 'none';
+  document.getElementById('editMode').style.display = 'block';
+  const wine = positions[currentSlot]?.wine;
+  document.getElementById('modalTitle').textContent = wine ? 'Modifier' : 'Ajouter un vin';
+  document.getElementById('inputNom').value       = wine?.nom || '';
+  document.getElementById('inputDomaine').value   = wine?.domaine || '';
+  document.getElementById('inputMillesime').value = wine?.millesime || '';
+  document.getElementById('inputRegion').value    = wine?.region || '';
+}
+
+function switchToEdit() { showEditMode(); }
+
+function cancelEdit() {
+  const wine = positions[currentSlot]?.wine;
+  if (wine) showViewMode(wine);
+  else closeModal();
+}
+
+function saveWine() {
+  const nom = document.getElementById('inputNom').value.trim();
+  if (!nom) { document.getElementById('inputNom').focus(); return; }
+  positions[currentSlot].wine = {
+    nom,
+    domaine:   document.getElementById('inputDomaine').value.trim(),
+    millesime: document.getElementById('inputMillesime').value.trim(),
+    region:    document.getElementById('inputRegion').value.trim(),
+  };
+  save(); render(); closeModal();
+}
+
+function removeWine() {
+  if (confirm('Retirer cette bouteille ?')) {
+    positions[currentSlot].wine = null;
+    save(); render(); closeModal();
+  }
+}
+
+function deleteCasier() {
+  const casier = positions[currentSlot];
+  if (!casier) return;
+  const msg = casier.wine
+    ? `Supprimer le casier n°${casier.id} et son vin ?`
+    : `Supprimer le casier n°${casier.id} ?`;
+  if (!confirm(msg)) return;
+  positions[currentSlot] = null;
+  save(); closeModal(); render();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  currentSlot = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+// ─── Init ───
+// Affichage immédiat depuis localStorage (évite le flash blanc)
+(function() {
+  const loc = JSON.parse(localStorage.getItem('cave_positions') || 'null');
+  if (loc && loc.length === SIZE) positions = loc;
+})();
+render();
+
+if (typeof google !== 'undefined') {
+  if (API_KEY    !== 'YOUR_API_KEY')    loadFromSheets();   // lecture publique
+  if (CLIENT_ID  !== 'YOUR_CLIENT_ID') initTokenClient();  // auth écriture (sans pop-up)
+}
+</script>
+</body>
+</html>
